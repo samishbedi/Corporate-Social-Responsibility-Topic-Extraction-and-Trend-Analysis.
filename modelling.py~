@@ -1,0 +1,56 @@
+import nltk
+from nltk import *
+import gensim
+from gensim import *
+import pyLDAvis.gensim
+import csv
+from collections import defaultdict
+columns = defaultdict(list)
+from stop_words import get_stop_words
+from nltk.stem.porter import PorterStemmer
+import collections
+from nltk.stem.wordnet import WordNetLemmatizer
+
+with open("scopus.csv",'r') as f:
+  reader=csv.DictReader(f)
+  for row in reader:    
+    for(k,v) in row.items():
+      columns[k].append(v)
+
+
+en_stop = get_stop_words('en')
+tokenizer = RegexpTokenizer(r'\w+')
+p_stemmer = PorterStemmer()
+#wordnet_lemmatizer = WordNetLemmatizer()
+text_tak=[]
+
+for a,b,c,d in zip(columns['Title'],columns['Abstract'],columns['Index Keywords'],columns['Author Keywords']):
+  text_tak.append((str(a)+str(b)+str(c)+str(d)))
+
+texts = []
+
+for i in text_tak:
+    raw = i.lower()
+    tokens = tokenizer.tokenize(raw)
+    stopped_tokens = [i for i in tokens if not i in en_stop]
+    #lem_tokes=[wordnet_lemmatizer.lemmatize(i) for i in stopped_tokens]
+    stemmed_tokens = [p_stemmer.stem(i) for i in stopped_tokens]
+    fdist = nltk.FreqDist(stemmed_tokens)
+    fin_tokens = [w for w in tokens if len(w)> 2 and fdist[w] > 1]
+    texts.append(fin_tokens)
+    
+dictionary = corpora.Dictionary(texts)
+
+#dict_f=open('dicitonary.txt','w')
+#for k,v in (collections.OrderedDict(sorted(dictionary.items()))).iteritems():
+#  print k,v
+
+#print dictionary
+corpus = [dictionary.doc2bow(text) for text in texts]
+corpus_saved=corpora.MmCorpus.serialize('/tmp/corpus.mm', corpus)
+
+ldamodel = gensim.models.ldamodel.LdaModel(corpus, num_topics=5, id2word = dictionary, passes=40)
+print ldamodel.show_topics()
+vis=pyLDAvis.gensim.prepare(ldamodel, corpus, dictionary)
+pyLDAvis.show(vis)
+#print len(corpus)
